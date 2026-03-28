@@ -11,14 +11,10 @@
             "id": "c99e8f190645a103",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Done/completed_HYDROLOGY_live_test_20260327_233413.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "completed_HYDROLOGY_live_test_20260327_233413"
+              "title": "New tab"
             }
           }
         ]
@@ -78,7 +74,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 442.5
   },
   "right": {
     "id": "737ca95bebc342fe",
