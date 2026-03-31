@@ -1,3 +1,22 @@
+# Core Dependencies
 pandas>=2.0.0
 watchdog>=3.0.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+
+# Email
+smtplib-ssl>=0.1.0
+
+# Clipboard (LinkedIn workaround)
+pyperclip>=1.8.0
+
+# AI Brain
 qwen-cli>=1.0.0
+
+# Social Media (Optional)
+# tweepy>=4.14.0  # Twitter/X API
+
+# Development (Optional)
+# pytest>=7.0.0  # For testing
+# black>=23.0.0  # Code formatting
+# flake8>=6.0.0  # Linting

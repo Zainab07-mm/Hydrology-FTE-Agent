@@ -180,6 +180,11 @@ Your CSV files must have these columns:
         if file_hash in self.processed_files:
             return
 
+        # Print to console for visibility
+        print(f"\n{'='*60}")
+        print(f"📥 NEW CSV FILE DETECTED: {source_path.name}")
+        print(f"{'='*60}")
+
         logger.info(f"New CSV file detected: {source_path.name}")
 
         # Validate the CSV file before processing
@@ -187,12 +192,17 @@ Your CSV files must have these columns:
 
         if not is_valid:
             logger.error(f"Invalid CSV file: {source_path.name} - {error_message}")
+            print(f"❌ INVALID FILE: {error_message}")
+            print(f"   File moved to Errors folder")
             self.handle_invalid_file(source_path, error_message)
             return
 
         # File is valid, create action file
+        print(f"✅ File validated successfully")
         self.create_action_file(source_path)
         self.processed_files.add(file_hash)
+        print(f"⏳ Action file created in Needs_Action folder")
+        print(f"{'='*60}\n")
     
     def create_action_file(self, csv_path: Path) -> Path:
         """Create a markdown action file in Needs_Action folder."""

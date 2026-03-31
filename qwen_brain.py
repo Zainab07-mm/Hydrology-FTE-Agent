@@ -9,6 +9,11 @@ Qwen is an open-source AI model - no API credits required.
 Requirements:
     - Qwen CLI installed and configured
     - Run: qwen --version to verify installation
+
+⚠️  NO FALLBACK LOGIC:
+    - If Qwen fails, the system stops with an error
+    - No deterministic fallback is used
+    - Qwen CLI MUST be working for the system to run
 """
 
 import subprocess
@@ -76,25 +81,34 @@ def decide_next_skill(state: dict) -> str:
 
         skill = _parse_qwen_response(output)
 
-        # Validate the decision
-        if skill == "DONE" and state.get("results") is None:
-            print("⚠️ Qwen returned DONE prematurely, re-evaluating...")
-            return _deterministic_decision(state)
-
         return skill
 
     except FileNotFoundError:
-        print("❌ Qwen CLI not found!")
-        print("   Install: npm install -g @qwen-code/qwen-code")
-        print("   Or visit: https://github.com/QwenLM/Qwen")
+        print("\n" + "="*60)
+        print("❌ CRITICAL ERROR: Qwen CLI not found!")
+        print("="*60)
+        print("\nQwen CLI is required for this system to work.")
+        print("There is NO fallback logic - Qwen MUST be installed.")
+        print("\n📦 Install Qwen CLI:")
+        print("   npm install -g @qwen-code/qwen-code")
+        print("\n🔗 Or visit: https://github.com/QwenLM/Qwen")
+        print("\n💡 After installation, verify:")
+        print("   qwen --version")
+        print("="*60)
         raise
 
     except subprocess.TimeoutExpired:
-        print("⚠️ Qwen request timed out (60s limit)")
+        print("\n" + "="*60)
+        print("❌ CRITICAL ERROR: Qwen request timed out (60s limit)")
+        print("="*60)
         raise
 
     except Exception as e:
-        print(f"❌ Qwen error: {e}")
+        print("\n" + "="*60)
+        print(f"❌ CRITICAL ERROR: {e}")
+        print("="*60)
+        print("Qwen AI is required - no fallback available.")
+        print("="*60)
         raise
 
 
@@ -160,25 +174,6 @@ def _parse_qwen_response(response: str) -> str:
 
     # Default to DONE if unclear
     return "DONE"
-
-
-def _deterministic_decision(state: dict) -> str:
-    """
-    Deterministic decision logic for timeout/error scenarios.
-    This is NOT a fallback - it's a safety mechanism for edge cases.
-
-    Uses simple state machine logic based on workflow progress.
-    """
-    if state.get("data") is None:
-        return "ingest_hydrology_data"
-    elif "Discharge" not in state.get("data", {}):
-        return "compute_discharge"
-    elif state.get("results") is None:
-        return "analyze_flow_condition"
-    elif "generate_hydrology_report" not in state.get("log", []):
-        return "generate_hydrology_report"
-    else:
-        return "DONE"
 
 
 def update_dashboard(vault_path: str, status: str, last_action: str = "", current_skill: str = ""):

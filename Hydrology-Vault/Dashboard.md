@@ -1,7 +1,7 @@
 # 🌊 Hydrology FTE Dashboard
 
-**Last Updated:** 2026-03-28 19:39:09
-**Status:** Idle
+**Last Updated:** 2026-03-31 14:41:03
+**Status:** Running
 
 ---
 
@@ -9,15 +9,16 @@
 
 | Metric | Value |
 |--------|-------|
-| Files in Inbox | 1 |
+| Files in Inbox | 2 |
 | Files Processing | 0 |
-| Reports Generated | 18 |
+| Reports Generated | 1 |
 
 ---
 
 ## 📥 Inbox Status
 
-- live_test.csv
+- river_data.csv
+- test_plan.csv
 
 ---
 
@@ -29,24 +30,7 @@
 
 ## ✅ Completed Reports
 
-- completed_HYDROLOGY_live_test_20260327_233222.md
-- completed_HYDROLOGY_live_test_20260327_233413.md
-- completed_HYDROLOGY_live_test_20260328_014509.md
-- completed_HYDROLOGY_live_test_20260328_020227.md
-- completed_HYDROLOGY_live_test_20260328_020642.md
-- completed_HYDROLOGY_live_test_20260328_023645.md
-- completed_HYDROLOGY_live_test_20260328_191129.md
-- completed_HYDROLOGY_live_test_20260328_193834.md
-- completed_HYDROLOGY_test_data_20260327_232246.md
-- ERROR_empty_test_20260328_191351.md
-- report_live_test_20260327_233229.md
-- report_live_test_20260327_233420.md
-- report_live_test_20260328_014524.md
-- report_live_test_20260328_020234.md
-- report_live_test_20260328_020649.md
-- report_live_test_20260328_193904.md
-- report_test_data_20260327_232253.md
-- test_report.md
+- test_report_final.md
 
 ---
 
@@ -54,8 +38,8 @@
 
 - **Brain:** Qwen AI (Open Source)
 - **Watcher:** File System Watcher (Active)
-- **Last Action:** Completed: live_test.csv
-- **Current Skill:** DONE
+- **Last Action:** System started
+- **Current Skill:** waiting
 
 ---
 

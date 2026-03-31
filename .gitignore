@@ -28,18 +28,35 @@ Thumbs.db
 report*.md
 Hydrology-Vault/Done/*.md
 Hydrology-Vault/Needs_Action/*.md
-
-# Environment
-.env
-*.env
+Hydrology-Vault/Plans/*.md
+Hydrology-Vault/CEO_Briefings/*.md
+Hydrology-Vault/Errors/*.md
+Hydrology-Vault/audit_log.txt
+Hydrology-Vault/logs/*.txt
 
 # User Data (PROTECT PRIVACY)
 Hydrology-Vault/Inbox/*.csv
+Hydrology-Vault/Weather_Inbox/*.txt
 *.xlsx
 *.xls
 
-# API Keys & Secrets
+# API Keys & Secrets (CRITICAL - NEVER COMMIT)
+.env
+.env.local
+.env.*.local
 *.key
 *.secret
 credentials.json
 config.local.json
+email_log.txt
+invoice_log.txt
+social_log.txt
+linkedin_log.txt
+
+# Odoo Database (if local)
+*.dump
+*.sql
+
+# Personal Config
+Hydrology-Vault/.obsidian/
+Hydrology-Vault/Dashboard.md

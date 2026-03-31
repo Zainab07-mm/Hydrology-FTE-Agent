@@ -11,14 +11,10 @@
             "id": "c99e8f190645a103",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Done/completed_HYDROLOGY_live_test_20260327_233413.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "completed_HYDROLOGY_live_test_20260327_233413"
+              "title": "New tab"
             }
           }
         ]
@@ -78,7 +74,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 372.5
   },
   "right": {
     "id": "737ca95bebc342fe",
@@ -183,8 +179,21 @@
       "bases:Create new base": false
     }
   },
-  "active": "1928b17b7d640e76",
+  "active": "c99e8f190645a103",
   "lastOpenFiles": [
+    "Errors/ERROR_TestError_20260331_014533.md",
+    "Errors/error_log.txt",
+    "Done/test_report_final.md",
+    "audit_log.txt",
+    "CEO_Briefings/SAMPLE_CEO_Brief_With_Data.md",
+    "CEO_Briefings/CEO_Brief_20260330_20260331_011847.md",
+    "CEO_Briefings",
+    "logs/ralph_log.txt",
+    "logs/ralph_audit_log.txt",
+    "logs",
+    "LinkedIn_Posts/sample_post.md",
+    "Needs_Action/APPROVAL_Jhelum_20260330_152700.md",
+    "Done/completed_HYDROLOGY_test_plan_20260329_224111.md",
     "Company_Handbook.md",
     "Done/completed_HYDROLOGY_live_test_20260327_233413.md",
     "Done/completed_HYDROLOGY_live_test_20260327_233222.md",
