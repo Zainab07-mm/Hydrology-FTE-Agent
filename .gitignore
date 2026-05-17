@@ -33,6 +33,7 @@ Hydrology-Vault/CEO_Briefings/*.md
 Hydrology-Vault/Errors/*.md
 Hydrology-Vault/audit_log.txt
 Hydrology-Vault/logs/*.txt
+Hydrology-Vault/Errors/*
 
 # User Data (PROTECT PRIVACY)
 Hydrology-Vault/Inbox/*.csv
@@ -60,3 +61,11 @@ linkedin_log.txt
 # Personal Config
 Hydrology-Vault/.obsidian/
 Hydrology-Vault/Dashboard.md
+
+# API Keys & Secrets (CRITICAL - NEVER COMMIT)
+.env
+settings.json          <-- Add this line right here!
+.env.local
+.env.*.local
+*.key
+...

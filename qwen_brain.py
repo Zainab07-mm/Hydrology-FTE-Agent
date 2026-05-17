@@ -1,298 +1,139 @@
-"""
-Qwen Brain for Hydrology FTE Agent
-
-This module uses Qwen AI (via CLI) as the reasoning engine to decide
-which skill to execute next based on the current workflow state.
-
-Qwen is an open-source AI model - no API credits required.
-
-Requirements:
-    - Qwen CLI installed and configured
-    - Run: qwen --version to verify installation
-
-⚠️  NO FALLBACK LOGIC:
-    - If Qwen fails, the system stops with an error
-    - No deterministic fallback is used
-    - Qwen CLI MUST be working for the system to run
-"""
-
-import subprocess
+import os
 import json
-from pathlib import Path
-from datetime import datetime
-
-
-def decide_next_skill(state: dict) -> str:
-    """
-    Use Qwen AI to decide the next skill to execute.
-
-    Args:
-        state: Current workflow state containing file_path, data, results, log
-
-    Returns:
-        Name of the next skill to run, or "DONE" if workflow is complete
-    """
-    prompt = _build_qwen_prompt(state)
-
-    try:
-        # Find the Qwen CLI path
-        # Qwen CLI is installed via npm, so we need to call it through node
-        import os
-        import sys
-
-        # Try to find qwen CLI script
-        qwen_cli_path = None
-        possible_paths = [
-            os.path.join(os.getenv('APPDATA', ''), 'npm', 'node_modules', '@qwen-code', 'qwen-code', 'cli.js'),
-            r'C:\Users\zaina\AppData\Roaming\npm\node_modules\@qwen-code\qwen-code\cli.js',
-        ]
-
-        for path in possible_paths:
-            if os.path.exists(path):
-                qwen_cli_path = path
-                break
-
-        if qwen_cli_path:
-            # Call via node directly
-            process = subprocess.run(
-                ['node', qwen_cli_path, '--prompt', prompt],
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
-        else:
-            # Fallback to calling 'qwen' command directly
-            process = subprocess.run(
-                ['qwen', '--prompt', prompt],
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
-
-        if process.returncode != 0:
-            raise RuntimeError(f"Qwen CLI error: {process.stderr}")
-
-        output = process.stdout.strip()
-
-        if not output:
-            raise RuntimeError("Qwen returned empty response")
-
-        print(f"🧠 Qwen Output: {output}")
-
-        skill = _parse_qwen_response(output)
-
-        return skill
-
-    except FileNotFoundError:
-        print("\n" + "="*60)
-        print("❌ CRITICAL ERROR: Qwen CLI not found!")
-        print("="*60)
-        print("\nQwen CLI is required for this system to work.")
-        print("There is NO fallback logic - Qwen MUST be installed.")
-        print("\n📦 Install Qwen CLI:")
-        print("   npm install -g @qwen-code/qwen-code")
-        print("\n🔗 Or visit: https://github.com/QwenLM/Qwen")
-        print("\n💡 After installation, verify:")
-        print("   qwen --version")
-        print("="*60)
-        raise
-
-    except subprocess.TimeoutExpired:
-        print("\n" + "="*60)
-        print("❌ CRITICAL ERROR: Qwen request timed out (60s limit)")
-        print("="*60)
-        raise
-
-    except Exception as e:
-        print("\n" + "="*60)
-        print(f"❌ CRITICAL ERROR: {e}")
-        print("="*60)
-        print("Qwen AI is required - no fallback available.")
-        print("="*60)
-        raise
-
-
-def _build_qwen_prompt(state: dict) -> str:
-    """Build a strict, structured prompt for Qwen AI."""
-
-    # Simplify state for prompt (remove large data)
-    simplified_state = state.copy()
-    if simplified_state.get("data") is not None:
-        simplified_state["data"] = f"<DataFrame: {len(simplified_state['data'])} rows>"
-    if simplified_state.get("results") is not None:
-        simplified_state["results"] = f"<Results: {len(simplified_state['results'])} items>"
-
-    # Determine expected next step based on state
-    expected_next = "UNKNOWN"
-    if state.get("data") is None:
-        expected_next = "ingest_hydrology_data"
-    elif not hasattr(state["data"], 'columns') or 'Discharge' not in state["data"].columns:
-        expected_next = "compute_discharge"
-    elif state.get("results") is None:
-        expected_next = "analyze_flow_condition"
-    elif "generate_hydrology_report" not in state.get("log", []):
-        expected_next = "generate_hydrology_report"
-    else:
-        expected_next = "DONE"
-
-    return f"""You are a deterministic workflow controller.
-
-RESPOND WITH EXACTLY ONE OF THESE VALUES (no other text):
-- ingest_hydrology_data
-- compute_discharge
-- analyze_flow_condition
-- generate_hydrology_report
-- DONE
-
-Current workflow state:
-- data: {simplified_state.get("data")}
-- results: {simplified_state.get("results")}
-- log: {simplified_state.get("log")}
-
-The correct next step is: {expected_next}
-
-Your response (skill name only):"""
-
-
-def _parse_qwen_response(response: str) -> str:
-    """Parse Qwen's response to extract the skill name."""
-    response_lower = response.lower().strip()
-
-    # Check for completion
-    if "done" in response_lower or response_lower == "":
-        return "DONE"
-
-    # Check for specific skills
-    if "ingest" in response_lower:
-        return "ingest_hydrology_data"
-    elif "compute" in response_lower or "discharge" in response_lower:
-        return "compute_discharge"
-    elif "analyze" in response_lower or "condition" in response_lower or "flow" in response_lower:
-        return "analyze_flow_condition"
-    elif "report" in response_lower or "generate" in response_lower:
-        return "generate_hydrology_report"
-
-    # Default to DONE if unclear
-    return "DONE"
-
-
-def update_dashboard(vault_path: str, status: str, last_action: str = "", current_skill: str = ""):
-    """
-    Update the Dashboard.md with current agent status.
-
-    Args:
-        vault_path: Path to the Hydrology-Vault folder
-        status: Current agent status (Running, Idle, Processing, etc.)
-        last_action: Description of the last action performed
-        current_skill: Name of the currently executing skill
-    """
-    dashboard_path = Path(vault_path) / "Dashboard.md"
-
-    if not dashboard_path.exists():
-        return
-
-    # Count files in each folder
-    inbox_count = len(list((Path(vault_path) / "Inbox").glob("*.csv")))
-    processing_count = len(list((Path(vault_path) / "Needs_Action").glob("*.md")))
-    done_count = len(list((Path(vault_path) / "Done").glob("*.md")))
-
-    # Get file lists
-    inbox_files = "\n".join([f"- {f.name}" for f in (Path(vault_path) / "Inbox").glob("*.csv")]) or "- (empty)"
-    processing_files = "\n".join([f"- {f.name}" for f in (Path(vault_path) / "Needs_Action").glob("*.md")]) or "- (none)"
-    done_files = "\n".join([f"- {f.name}" for f in (Path(vault_path) / "Done").glob("*.md")]) or "- (none)"
-
-    content = f"""# 🌊 Hydrology FTE Dashboard
-
-**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-**Status:** {status}
-
----
-
-## 📊 Quick Stats
-
-| Metric | Value |
-|--------|-------|
-| Files in Inbox | {inbox_count} |
-| Files Processing | {processing_count} |
-| Reports Generated | {done_count} |
-
----
-
-## 📥 Inbox Status
-
-{inbox_files}
-
----
-
-## ⚡ Currently Processing
-
-{processing_files}
-
----
-
-## ✅ Completed Reports
-
-{done_files}
-
----
-
-## 🤖 Agent Status
-
-- **Brain:** Qwen AI (Open Source)
-- **Watcher:** File System Watcher (Active)
-- **Last Action:** {last_action}
-- **Current Skill:** {current_skill}
-
----
-
-## 📋 Rules of Engagement
-
-1. Process all CSV files dropped in `/Inbox`
-2. Calculate discharge: `Width_m × Depth_m × Velocity_mps`
-3. Classify flow condition:
-   - Low: Q < 50 m³/s
-   - Moderate: 50 ≤ Q ≤ 150 m³/s
-   - High: Q > 150 m³/s
-4. Assess risk level based on discharge
-5. Generate report in `/Done` folder
-6. Flag high-risk readings for human review
-
----
-
-## 🚨 Alerts
-
-- (No active alerts)
-
----
-
-*Auto-generated by Hydrology FTE Agent with Qwen AI*
-"""
-
-    dashboard_path.write_text(content, encoding='utf-8')
-
-
-if __name__ == "__main__":
-    # Test the Qwen Brain
-    print("=" * 50)
-    print("🧪 Testing Qwen Brain")
-    print("=" * 50)
-
-    test_state = {
-        "file_path": "hydrology_data/sample.csv",
-        "data": None,
-        "results": None,
-        "log": []
+import requests
+
+def call_openrouter(prompt):
+    """Helper function to route prompts directly through OpenRouter API checking multiple paths."""
+    api_key = None
+    model_name = "qwen/qwen-2.5-72b-instruct" # Fallback default
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    
+    # Check multiple possible paths for settings.json
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), 'settings.json'), # Same folder as qwen_brain.py
+        os.path.join(os.getcwd(), 'settings.json'),              # Main root directory where you run main.py
+        'settings.json'                                           # Current execution fallback
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    if config.get("OPENROUTER_API_KEY"):
+                        api_key = config.get("OPENROUTER_API_KEY")
+                        if config.get("model"):
+                            model_name = config.get("model")
+                        if config.get("base_url"):
+                            url = f"{config.get('base_url').rstrip('/')}/chat/completions"
+                        break # Found a valid key! Stop searching paths.
+            except Exception:
+                pass
+
+    # Fallback to standard environment variable if settings.json wasn't found or was unparseable
+    if not api_key:
+        api_key = os.getenv("OPENROUTER_API_KEY")
+
+    # ABSOLUTE BACKUP: If environment variable parsing fails, inject the key directly
+    if not api_key or "your_" in api_key or api_key == "":
+        raise ValueError("❌ OpenRouter API Key missing or unparseable in your environment configuration.")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "model": model_name,
+        "messages": [{"role": "user", "content": prompt}]
     }
 
-    print("\nTest 1: Initial state (should return ingest_hydrology_data)")
     try:
-        next_skill = decide_next_skill(test_state)
-        print(f"✅ Result: {next_skill}")
-    except SystemExit as e:
-        print(f"⚠️ Qwen CLI not available: {e}")
-        print("   Using deterministic decision for testing...")
-        print(f"   Result: {_deterministic_decision(test_state)}")
+        import certifi
+        response = requests.post(
+            url, 
+            headers=headers, 
+            data=json.dumps(data), 
+            timeout=30,
+            verify=certifi.where()
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result['choices'][0]['message']['content'].strip()
+    except Exception as e:
+        raise RuntimeError(f"OpenRouter API call failed: {e}")
 
-    print("\n" + "=" * 50)
-    print("Test complete!")
-    print("=" * 50)
+def decide_next_skill(state):
+    """
+    Silver Tier Brain Logic.
+    Reads current workflow state and uses OpenRouter to decide the next step.
+    """
+    # Create a clear prompt telling Qwen what steps are completed
+    prompt = f"""
+    You are the brain of an autonomous hydrology agent. Based on the current history log, decide what the immediate next tool step should be.
+    
+    Current History Log of actions taken: {state.get('log', [])}
+    Has data been ingested? {'Yes' if state.get('data') is not None else 'No'}
+    Are computations complete? {'Yes' if state.get('results') is not None else 'No'}
+    
+    Your available steps are:
+    - "ingest_hydrology_data" (if data isn't loaded yet)
+    - "compute_discharge" (if data is loaded but discharge isn't calculated)
+    - "analyze_flow_condition" (if data is calculated but risks aren't evaluated)
+    - "generate_hydrology_report" (if evaluations are ready but no report is written)
+    - "DONE" (if everything is completed)
+    
+    Respond with EXACTLY one word from the choices above. Do not include any punctuation, conversational filler, or formatting.
+    """
+    
+    ai_decision = call_openrouter(prompt)
+    
+    # Clean up any potential markdown formatting from the response string
+    cleaned_decision = ai_decision.replace('"', '').replace("'", "").strip()
+    
+    valid_skills = ["ingest_hydrology_data", "compute_discharge", "analyze_flow_condition", "generate_hydrology_report", "DONE"]
+    
+    for skill in valid_skills:
+        if skill in cleaned_decision:
+            return skill
+            
+    # Fallback default loop tracker if response is ambiguous
+    if not state.get('log'):
+        return "ingest_hydrology_data"
+    return "DONE"
+
+def update_dashboard(vault_path, status="Running", last_action="None", task_queue="Empty"):
+    """
+    Updates the Obsidian Dashboard.md file with detailed system status tracking.
+    Matches the exact 4-argument signature expected by the Orchestrator loop.
+    """
+    try:
+        dashboard_path = os.path.join(vault_path, "Dashboard.md")
+        
+        # Read existing dashboard content if it exists
+        content = ""
+        if os.path.exists(dashboard_path):
+            with open(dashboard_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                
+        # Build a beautifully formatted markdown block for your Obsidian Vault
+        status_block = (
+            "### 🤖 Current Agent Status\n"
+            f"- **System State:** `{status}`\n"
+            f"- **Last Completed Action:** {last_action}\n"
+            f"- **Task Queue Status:** `{task_queue}`\n"
+        )
+        
+        # If the status section already exists, strip the old one out to prevent infinite appending
+        if "### 🤖 Current Agent Status" in content:
+            parts = content.split("### 🤖 Current Agent Status")
+            # Overwrite the old tracking block with the fresh one
+            new_content = parts[0] + status_block
+        else:
+            new_content = content + "\n\n" + status_block
+
+        with open(dashboard_path, "w", encoding="utf-8") as f:
+            f.write(new_content)
+            
+    except Exception as e:
+        print(f"⚠️ Dashboard update skipped: {e}")

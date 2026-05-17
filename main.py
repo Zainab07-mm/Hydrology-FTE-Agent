@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 """
 Hydrology FTE Agent - Main Entry Point
 
@@ -100,27 +102,47 @@ def print_qwen_not_available():
 
 
 def run_autonomous_mode():
-    """Run the orchestrator in autonomous mode (24/7)."""
-    # Check Qwen availability first
-    print("\n🔍 Checking Qwen CLI availability...")
-    if not check_qwen_available():
-        print_qwen_not_available()
-        sys.exit(1)
-    print("✅ Qwen CLI is available\n")
+    """Run the orchestrator and ALL watchers together automatically (Silver Tier Auto-Mode)."""
+    # NOTE: Since you are using OpenRouter, we bypass the local Node.js CLI check 
+    print("✅ OpenRouter API configured as the AI Brain.")
 
     print("=" * 60)
-    print("🌊 Hydrology FTE Agent - Autonomous Mode")
+    print("🌊 Hydrology FTE Agent - Autonomous Silver Tier Mode")
     print("=" * 60)
-    print("Starting orchestrator and watchers...")
+    print("Starting background file watchers and orchestrator core...")
     print("Drop CSV files in Hydrology-Vault/Inbox to process")
     print("Drop weather bulletins in Hydrology-Vault/Weather_Inbox")
     print("Press Ctrl+C to stop")
     print("=" * 60)
 
-    from orchestrator import HydrologyOrchestrator
+    # --- STEP 1: Start the Watchers automatically in background threads ---
+    from watchers.csv_watcher import CSVWatcher
+    from watchers.pdf_watcher import PDFWatcher
+    from watchers.approval_watcher import ApprovalWatcher
+
     vault_path = Path(__file__).parent / 'Hydrology-Vault'
+
+    csv_watcher = CSVWatcher(str(vault_path))
+    weather_watcher = PDFWatcher(str(vault_path))
+    approval_watcher = ApprovalWatcher(str(vault_path))
+
+    # Spin up watchers as background daemons so they don't block the main thread
+    threading.Thread(target=csv_watcher.start, daemon=True).start()
+    threading.Thread(target=weather_watcher.start, daemon=True).start()
+    threading.Thread(target=approval_watcher.start, daemon=True).start()
+    print("📂 All background folder watchers started successfully!")
+
+    # --- STEP 2: Start the Main Orchestrator Loop ---
+    from orchestrator import HydrologyOrchestrator
     orchestrator = HydrologyOrchestrator(str(vault_path))
-    orchestrator.run()
+    
+    try:
+        orchestrator.run()
+    except KeyboardInterrupt:
+        print("\nStopping agent gracefully...")
+        csv_watcher.stop()
+        weather_watcher.stop()
+        approval_watcher.stop()
 
 
 def run_watcher_mode():
