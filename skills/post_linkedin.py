@@ -1,20 +1,21 @@
 """
-LinkedIn Auto-Posting Skill for Hydrology FTE Agent
+LinkedIn Post Skill for Hydrology FTE Agent
 
-This skill automatically generates and posts LinkedIn content 
-to promote Zainab's hydrology consulting services.
+This skill generates LinkedIn post drafts from recent reports.
+Results come from a prototype tested on sample data, so every
+draft should be reviewed by a person before it is published.
 
 TWO MODES:
 Mode A: Real LinkedIn API (when LINKEDIN_ACCESS_TOKEN exists)
-Mode B: Smart workaround fallback (when token not available)
+Mode B: Workaround fallback (when token not available)
 
 The system auto-detects which mode to use based on .env configuration.
 
 Post Structure:
-- HOOK: Striking fact using real data
-- INSIGHT: Real numbers from reports
+- HOOK: One factual sentence using the data provided
+- INSIGHT: Numbers from the reports
 - VALUE: What I can do for clients
-- CALL TO ACTION: Invite consulting inquiries
+- CALL TO ACTION: Invite inquiries
 - HASHTAGS: Relevant tags
 """
 
@@ -133,26 +134,19 @@ def extract_data_from_reports(reports):
                             data['high_risk_count'] += 1
                 except ValueError:
                     pass
-        
-        # Extract notable findings
-        if 'HIGH' in content.upper() or 'FLOOD' in content.upper():
-            data['notable_findings'].append('High risk flood conditions detected')
-        
-        if 'rainfall' in content.lower():
-            data['notable_findings'].append('Heavy rainfall impacts observed')
     
     return data
 
 
 def generate_linkedin_post(reports, vault_path='Hydrology-Vault'):
     """
-    Generate a LinkedIn sales post using Qwen AI.
+    Generate a LinkedIn post draft using Qwen AI.
     
     Post structure:
-    - HOOK: Striking fact using real data
-    - INSIGHT: Real numbers from reports
+    - HOOK: One factual sentence using the data provided
+    - INSIGHT: Numbers from the reports
     - VALUE: What I can do for clients
-    - CALL TO ACTION: Invite consulting inquiries
+    - CALL TO ACTION: Invite inquiries
     - HASHTAGS: Relevant tags
     
     Args:
@@ -169,46 +163,47 @@ def generate_linkedin_post(reports, vault_path='Hydrology-Vault'):
     
     # Get user info from .env
     my_name = os.getenv('MY_NAME', 'Zainab Mukhtar')
-    my_email = os.getenv('MY_EMAIL', 'zainabmukhtar2277@gmail.com')
+    my_email = os.getenv('MY_EMAIL', 'zainab.mukhtar077@gmail.com')
     
     # Build prompt for Qwen AI
-    prompt = f"""You are helping {my_name}, a hydrology student offering freelance consulting services.
+    prompt = f"""You are helping {my_name}, a hydrology graduate who builds automation tools for water data and is open to freelance work.
 
-Generate a LinkedIn post (150-250 words) to attract consulting clients.
+Generate a LinkedIn post (150-250 words).
 
 Use this EXACT structure:
 
 HOOK (1 sentence):
-A striking fact using real data from this week's reports.
-Example: "This week my AI monitoring system detected HIGH RISK flooding conditions on the Chenab River 6 hours before any official warning."
+One factual sentence using the data below.
+Example: "I ran my hydrology prototype on sample river data this week and it flagged one river as high flow."
 
 INSIGHT (2-3 sentences):
-Real numbers from reports. River names. What it means.
-Example: "Discharge reached 180 m³/s — 20% above flood threshold. Combined with 62mm catchment rainfall, downstream communities faced genuine risk."
+Numbers from the reports below. River names. What the tool did.
+Example: "The tool computed a discharge of 157.5 m³/s from width, depth and velocity inputs and classified it as high flow under its demonstration thresholds."
 
 VALUE (2 sentences):
-What I can do for clients with this expertise.
-Example: "Early flood detection saves lives and reduces infrastructure damage. I help NGOs, municipalities and engineering firms understand water risk before it becomes a crisis."
+What I can do for clients.
+Example: "I'm a hydrology graduate building automation tools for water data, and I'm open to freelance work in this area."
 
 CALL TO ACTION (1-2 sentences):
-Invite consulting inquiries.
-Example: "Need a flood risk assessment or hydrology report for your project? DM me or email {my_email}"
+Invite inquiries.
+Example: "If you work with water data and want to talk about automation, DM me or email {my_email}"
 
 HASHTAGS:
-#Hydrology #WaterResources #Pakistan #FloodRisk #FreelanceConsulting #WaterManagement #ClimateResilience
+#Hydrology #WaterResources #Pakistan #Automation #FreelanceConsulting #WaterManagement
 
-REAL DATA FROM REPORTS THIS WEEK:
+DATA FROM RECENT REPORTS (may include sample or test data):
 - Total reports generated: {data['total_reports']}
-- Rivers monitored: {', '.join(set(data['rivers'])) if data['rivers'] else 'Multiple rivers'}
-- High risk detections: {data['high_risk_count']}
+- Rivers in the reports: {', '.join(set(data['rivers'])) if data['rivers'] else 'Multiple rivers'}
+- Rivers classified as high flow: {data['high_risk_count']}
 - Maximum discharge: {data['max_discharge']:.2f} m³/s on {data['max_discharge_river'] if data['max_discharge_river'] else 'unknown river'}
-- Notable findings: {', '.join(set(data['notable_findings'])) if data['notable_findings'] else 'Routine monitoring completed'}
 
 MY DETAILS:
 - Name: {my_name}
 - Email: {my_email}
 
-Write the complete post now. Make it sound human and professional. Include real numbers. Keep it 150-250 words."""
+Use only the numbers listed above. Say that results come from a prototype tested on sample data. Do not claim early detection, do not compare with official warnings, and do not invent rainfall or thresholds.
+
+Write the complete post now. Make it sound human and professional. Keep it 150-250 words."""
 
     # Call Qwen AI
     try:
@@ -218,7 +213,6 @@ Write the complete post now. Make it sound human and professional. Include real 
         qwen_cli_path = None
         possible_paths = [
             os.path.join(os.getenv('APPDATA', ''), 'npm', 'node_modules', '@qwen-code', 'qwen-code', 'cli.js'),
-            r'C:\Users\zaina\AppData\Roaming\npm\node_modules\@qwen-code\qwen-code\cli.js',
         ]
 
         for path in possible_paths:
@@ -364,7 +358,7 @@ def post_via_api(post_content):
 
 def post_via_workaround(post_content):
     """
-    Mode B: Smart workaround fallback.
+    Mode B: Workaround fallback.
     
     - Saves post to Hydrology-Vault/LinkedIn_Posts/
     - Copies post to clipboard automatically
@@ -401,7 +395,7 @@ word_count: {len(post_content.split())}
 
 **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-**Status:** Ready to post
+**Status:** Draft - review before posting
 
 ---
 
@@ -411,16 +405,16 @@ word_count: {len(post_content.split())}
 
 ## 📤 Posting Instructions
 
-1. The post text has been copied to your clipboard
-2. LinkedIn is opening in your browser
-3. Click in the "Start a post" box
-4. Press Ctrl+V to paste
-5. Click the "Post" button
-6. Done! Takes 10 seconds!
+1. Read the draft and edit anything that is not accurate
+2. The post text has been copied to your clipboard
+3. LinkedIn is opening in your browser
+4. Click in the "Start a post" box
+5. Press Ctrl+V to paste
+6. Click the "Post" button
 
 ---
 
-*Generated by Hydrology FTE Agent - LinkedIn Auto-Poster*
+*Generated by Hydrology FTE Agent - LinkedIn Post Skill*
 """
         
         # Save the post file
@@ -437,15 +431,15 @@ word_count: {len(post_content.split())}
         
         # Show instructions
         print("\n" + "=" * 60)
-        print("=== LINKEDIN POST READY ===")
+        print("=== LINKEDIN POST DRAFT READY ===")
         print("=" * 60)
         print("\n✅ Post has been copied to your clipboard")
         print("🌐 LinkedIn is opening in your browser")
         print("\n📝 NEXT STEPS:")
-        print("   1. Click in the 'Start a post' box")
-        print("   2. Press Ctrl+V to paste")
-        print("   3. Click the 'Post' button")
-        print("   4. Done! Takes 10 seconds!")
+        print("   1. Read the draft and fix anything that is not accurate")
+        print("   2. Click in the 'Start a post' box")
+        print("   3. Press Ctrl+V to paste")
+        print("   4. Click the 'Post' button")
         print("\n" + "=" * 60)
         
         # Log the attempt
@@ -474,7 +468,7 @@ def post_to_linkedin(post_content):
         True if successful, False otherwise
     """
     print("\n" + "=" * 60)
-    print("📤 LinkedIn Auto-Poster")
+    print("📤 LinkedIn Poster")
     print("=" * 60)
     
     # Check for API token
@@ -611,7 +605,7 @@ def run(vault_path='Hydrology-Vault'):
 if __name__ == "__main__":
     # Test the LinkedIn posting skill
     print("=" * 50)
-    print("🧪 Testing LinkedIn Auto-Poster")
+    print("🧪 Testing LinkedIn Post Skill")
     print("=" * 50)
     
     result = run()
@@ -620,5 +614,5 @@ if __name__ == "__main__":
     print("Test Results:")
     print(f"  Success: {result['success']}")
     print(f"  Message: {result['message']}")
-    print(f"  Reports used: {result['reports_used']}")
+    print(f"  Reports used: {result.get('reports_used', 0)}")
     print("=" * 50)
