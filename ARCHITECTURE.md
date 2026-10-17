@@ -1,106 +1,88 @@
-# 🏗️ HydroWatch Pro — System Architecture
+# HydroWatch Pro: System Architecture
 
-> **Silver Tier: Functional Assistant for Hydrology Monitoring**
+> A prototype pipeline that turns river measurement files into discharge values, flow classifications and reports. Tested on sample data only.
 
 ---
 
 ## Table of Contents
 
 1. [Project Requirements](#project-requirements)
-2. [Why This Architecture](#why-this-architecture)
+2. [Design Choices](#design-choices)
 3. [Component Overview](#component-overview)
 4. [Data Flow](#data-flow)
-5. [MCP Server Pattern](#mcp-server-pattern)
-6. [Lessons Learned](#lessons-learned)
+5. [Human Approval Workflow](#human-approval-workflow)
+6. [Email Module](#email-module)
+7. [Notes and Limitations](#notes-and-limitations)
+8. [Possible Improvements](#possible-improvements)
 
 ---
 
 ## Project Requirements
 
-### 🥉 Bronze Tier: Foundation (Minimum Viable Deliverable)
+This project was built for the Personal AI Employee Hackathon (2026). The hackathon describes tiers of increasing scope. This project targeted the Bronze and Silver tiers.
 
-**Estimated time: 8-12 hours**
+### Bronze tier: foundation
 
-- ✅ Obsidian vault with `Dashboard.md` and `Company_Handbook.md`
-- ✅ One working Watcher script (file system monitoring)
-- ✅ Qwen CLI successfully reading from and writing to the vault
-- ✅ Basic folder structure: `/Inbox`, `/Needs_Action`, `/Done`
-- ✅ All AI functionality implemented as Agent Skills
+- Obsidian-style vault with `Dashboard.md` and a handbook file
+- One watcher script (file system monitoring)
+- Qwen CLI reading from and writing to the vault
+- Basic folder structure: `/Inbox`, `/Needs_Action`, `/Done`
+- AI functionality implemented as skills (small Python modules)
 
-### 🥈 Silver Tier: Functional Assistant
+### Silver tier: functional assistant
 
-**Estimated time: 20-30 hours**
+All Bronze requirements plus:
 
-**All Bronze requirements plus:**
+- Two or more watcher scripts (CSV, weather text files, approval files, Gmail)
+- A reasoning step that writes `Plan.md` files
+- One email module for an external action (Gmail SMTP)
+- A human approval step before sensitive actions
+- Scheduling through Windows Task Scheduler
 
-- ✅ Two or more Watcher scripts (CSV + Weather + Approval + Gmail)
-- ✅ Qwen reasoning loop that creates `Plan.md` files
-- ✅ One working MCP server for external action (Email via Gmail SMTP)
-- ✅ Human-in-the-loop approval workflow for sensitive actions
-- ✅ Basic scheduling via Windows Task Scheduler
-- ✅ All AI functionality implemented as Agent Skills
+**What has been tested:** the CSV workflow (data in, discharge and classification out, report written) has been run on sample files. The Gmail alert and LinkedIn code is written but has not been connected to live accounts or tested end to end.
 
-**AI Brain: Qwen CLI** (no fallback, no Claude)
+**AI component:** Qwen Code CLI. There is no fallback model.
 
 ---
 
-## Why This Architecture
+## Design Choices
 
-### Design Goals
+| Goal | Reason | How it is handled |
+|------|--------|-------------------|
+| Transparent | Hydrology reports should show their calculations | Formula-based skills; reports print the formula and the numbers |
+| Safe | Alerts should not go out without a person checking them | Human approval step before any email is sent |
+| Extensible | New data sources should be easy to add | Separate watchers and skills |
+| Low cost | Single-developer project | Python, pandas and a command-line AI tool; no paid cloud services |
 
-| Goal | Why It Mattered | How We Achieved It |
-|------|-----------------|-------------------|
-| **Autonomous** | Must run 24/7 without human intervention | Watchers + Orchestrator + Qwen AI |
-| **Transparent** | Hydrology reports must show calculations | Formula-based skills with plain English |
-| **Safe** | Flood alerts need human verification | Human-in-the-loop approval workflow |
-| **Extensible** | New data sources should be easy to add | Modular skill-based architecture |
-| **Affordable** | Target users are small consulting firms | Free/open-source stack, no cloud costs |
+### Alternatives that were not used
 
-### Why Not Other Approaches?
+- **Microservices:** too much overhead for a single-developer prototype.
+- **Serverless functions:** adds vendor-specific setup and per-use costs.
+- **One large script:** harder to test and extend.
 
-**❌ Microservices:**
-- Too complex for a single-developer project
-- Network overhead would slow down time-critical flood alerts
-- Debugging distributed systems is harder
+### Chosen approach
 
-**❌ Serverless (AWS Lambda):**
-- Cold starts would delay flood detection
-- Vendor lock-in concerns
-- Costs scale with usage (unpredictable)
-
-**❌ Monolithic Script:**
-- Hard to test individual components
-- No separation of concerns
-- Difficult to extend with new features
-
-**✅ Chosen: Modular Orchestrator Pattern**
-- Clear separation: Watchers → Orchestrator → Skills → Outputs
-- Each component is independently testable
-- Easy to add new watchers or skills
-- Runs locally with zero cloud costs
+A modular orchestrator pattern: Watchers, then Orchestrator, then Skills, then Outputs. Each part can be tested on its own, and new watchers or skills can be added without changing the others.
 
 ---
 
 ## Component Overview
 
-### 1. Watchers (Event-Driven Input)
+### 1. Watchers (input)
 
-**Purpose:** Detect new data files and create action requests.
+**Purpose:** detect new files and create action requests.
 
-| Watcher | Monitors | Triggers |
-|---------|----------|----------|
+| Watcher | Monitors | Creates |
+|---------|----------|---------|
 | `csv_watcher.py` | `Hydrology-Vault/Inbox/*.csv` | `HYDROLOGY_*.md` action files |
 | `pdf_watcher.py` | `Hydrology-Vault/Weather_Inbox/*.txt` | `WEATHER_*.md` action files |
-| `gmail_watcher.py` | Gmail inbox (with attachments) | Downloads CSV → saves to `Inbox/` |
-| `approval_watcher.py` | `Hydrology-Vault/Needs_Action/APPROVAL_*.md` | Processes human YES/NO decisions |
+| `gmail_watcher.py` | Gmail inbox (attachments) | Downloads CSV files into `Inbox/` |
+| `approval_watcher.py` | `Hydrology-Vault/Needs_Action/APPROVAL_*.md` | Reads human YES/NO decisions |
 
-**Why Separate Watchers?**
-- Different file formats need different parsers
-- Weather data has different structure than hydrology data
-- Approval files require human-in-the-loop logic
-- Email receiving is separate from file processing
+Different file types need different parsers, and approval files need their own logic, so each has its own watcher.
 
-**Design Pattern: Observer Pattern**
+Simplified sketch of the idea (not the exact code):
+
 ```python
 class CSVWatcher:
     def __init__(self, vault_path):
@@ -108,51 +90,42 @@ class CSVWatcher:
         self.needs_action = Path(vault_path) / 'Needs_Action'
 
     def start(self):
-        """Run forever, watching for new CSV files."""
+        """Keep checking the inbox for new CSV files."""
         while True:
-            csv_files = list(self.inbox.glob('*.csv'))
-            for csv_file in csv_files:
+            for csv_file in self.inbox.glob('*.csv'):
                 self.create_action_file(csv_file)
-            time.sleep(10)  # Check every 10 seconds
+            time.sleep(10)
 ```
 
 ---
 
-### 2. Orchestrator (Workflow Manager)
+### 2. Orchestrator (workflow manager)
 
-**Purpose:** Manage the end-to-end workflow for each task.
+**Purpose:** manage the steps for each task.
 
-**Responsibilities:**
-1. Parse action files from `Needs_Action/`
-2. Initialize workflow state
-3. Call Qwen AI to decide next skill
-4. Execute skills in order
-5. Handle task completion (move to `Done/`)
+1. Read action files from `Needs_Action/`
+2. Set up the workflow state
+3. Ask the Qwen model which skill should run next
+4. Run the skills in order
+5. Move finished tasks to `Done/`
 
-**Why a Separate Orchestrator?**
-- Watchers should only detect files, not process them
-- Processing logic is complex and needs state management
-- Orchestrator can be swapped without changing watchers
+Watchers only detect files. The orchestrator handles the processing, so either can be changed without touching the other.
 
-**State Machine:**
+Workflow states:
+
 ```
-Pending → Planning → Ingesting → Computing → Analyzing →
-Alerting → Reporting → Done
+Pending, Planning, Ingesting, Computing, Analyzing,
+Alerting, Reporting, Done
 ```
 
 ---
 
-### 3. Qwen AI Brain (Decision Maker)
+### 3. Qwen model (decision and writing)
 
-**Purpose:** Decide which skill to run next based on current state.
+**Purpose:** choose the next skill from the current state, and write the plain-language parts of reports and plans.
 
-**Why Qwen (not Claude)?**
-- Free and open-source
-- No API costs for unlimited calls
-- Runs locally (no network latency)
-- No fallback needed—Qwen is the only AI
+Simplified sketch of the prompt pattern:
 
-**Prompt Pattern:**
 ```python
 def decide_next_skill(state):
     prompt = f"""
@@ -171,185 +144,111 @@ def decide_next_skill(state):
     return call_qwen(prompt)
 ```
 
-**Reasoning Plans:**
-- Before processing, Qwen creates a `Plan_*.md` file
-- This file contains the AI's reasoning and analysis steps
-- Provides transparency for human review
-- Stored in `Needs_Action/` for audit trail
+**Reasoning plans:** before processing, the `create_plan` skill asks Qwen to write a `Plan_*.md` file. It records the planned analysis steps so a person can review them.
+
+The discharge and risk calculations are ordinary Python code. Qwen decides the order of steps and writes text. It does not do the calculations.
 
 ---
 
-### 4. Skills (Action Executors)
-
-**Purpose:** Execute specific tasks with clear inputs and outputs.
+### 4. Skills (action executors)
 
 | Skill | Input | Output |
 |-------|-------|--------|
 | `ingest_hydrology_data` | File path | DataFrame |
-| `compute_discharge` | DataFrame | DataFrame + Q column |
-| `analyze_flow_condition` | DataFrame + Q | Risk classification |
-| `create_plan` | Data preview | Markdown reasoning plan |
+| `compute_discharge` | DataFrame | DataFrame with a discharge column |
+| `analyze_flow_condition` | DataFrame with discharge | Low / moderate / high classification |
+| `create_plan` | Data preview | Markdown plan |
 | `generate_hydrology_report` | Results | Markdown report |
-| `send_alert_email` | Results + Risk | Approval request |
-| `post_linkedin` | Report | LinkedIn post (clipboard) |
+| `send_alert_email` | Results and risk | Approval request (email only after approval) |
+| `post_linkedin` | Recent reports | LinkedIn post draft (saved and copied to clipboard) |
 
-**Why Skills Pattern?**
-- Each skill is independently testable
-- Skills can be reused across workflows
-- Easy to add new skills without changing orchestrator
-- Clear contract: input → output
+Each skill has a clear input and output, so it can be tested on its own and reused.
 
 ---
 
-### 5. MCP Servers (API Integrations)
+### 5. Email module
 
-**Purpose:** Provide unified interface to external services.
-
-| MCP Server | External Service | Functions |
-|------------|------------------|-----------|
+| Module | External service | Function |
+|--------|------------------|----------|
 | `mcp_email_server.py` | Gmail SMTP | `send_email()` |
 
-**Why MCP Pattern?**
-- Skills call `mcp_email_server.send_email()` not raw SMTP
-- API changes only affect MCP server, not skills
-- Consistent interface across all external services
-- Easy to mock for testing
+Skills call `send_email()` instead of handling SMTP details themselves. If the email provider changes, only this module needs to change. See [Email Module](#email-module).
 
 ---
 
-### 6. Dashboard (System Monitoring)
+### 6. Dashboard
 
-**Purpose:** Display current system status in Obsidian vault.
-
-**Updates Every 10 Seconds:**
-- Current status (Idle / Processing / Alerting)
-- Last processed file
-- Today's statistics (reports generated, alerts sent)
-- System health indicators
-
-**Location:** `Hydrology-Vault/Dashboard.md`
+A markdown file at `Hydrology-Vault/Dashboard.md`, updated by the agent and by `update_dashboard.ps1`. It shows status, files in the inbox, files being processed, completed reports and the classification rules.
 
 ---
 
 ## Data Flow
 
-### Complete Journey: CSV to Report
+### From CSV to report
+
+All file names and values below are examples.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ STEP 1: CSV File Dropped in Inbox                               │
-│ User copies hydrology_data.csv to Hydrology-Vault/Inbox/        │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ STEP 2: CSV Watcher Detects File                                │
-│ csv_watcher.py scans Inbox/ every 10 seconds                    │
-│ Creates: HYDROLOGY_hydrology_data_20260331_081500.md            │
-│ Location: Hydrology-Vault/Needs_Action/                         │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ STEP 3: Orchestrator Picks Up Task                              │
-│ Reads action file, extracts source_path                         │
-│ Initializes state: {"file_path": "...", "data": None, ...}      │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ STEP 4: Qwen AI Creates Reasoning Plan                          │
-│ create_plan skill calls Qwen with data preview                  │
-│ Qwen returns: Plan_Chenab_20260331_081500.md                    │
-│ Plan includes: risk assessment, analysis steps, decision rules  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ STEP 5: Qwen AI Executes Skills (via Orchestrator)              │
-│ ┌─────────────────────────────────────────────────────────┐    │
-│ │ Skill 1: ingest_hydrology_data                          │    │
-│ │   Input: file_path                                      │    │
-│ │   Output: DataFrame with 4 rivers                       │    │
-│ └─────────────────────────────────────────────────────────┘    │
-│ ┌─────────────────────────────────────────────────────────┐    │
-│ │ Skill 2: compute_discharge                              │    │
-│ │   Input: DataFrame                                      │    │
-│ │   Output: DataFrame + Discharge column                  │    │
-│ │   Formula: Q = Width × Depth × Velocity                 │    │
-│ └─────────────────────────────────────────────────────────┘    │
-│ ┌─────────────────────────────────────────────────────────┐    │
-│ │ Skill 3: analyze_flow_condition                         │    │
-│ │   Input: DataFrame + Discharge                          │    │
-│ │   Output: Risk classification (LOW/MEDIUM/HIGH)         │    │
-│ └─────────────────────────────────────────────────────────┘    │
-│ ┌─────────────────────────────────────────────────────────┐    │
-│ │ Skill 4: send_alert_email                               │    │
-│ │   Input: Results with risk levels                       │    │
-│ │   Output: Approval requests for HIGH risk rivers        │    │
-│ │   Creates: APPROVAL_Chenab_20260331_081530.md           │    │
-│ │   Waits for human YES/NO decision                       │    │
-│ └─────────────────────────────────────────────────────────┘    │
-│ ┌─────────────────────────────────────────────────────────┐    │
-│ │ Skill 5: generate_hydrology_report                      │    │
-│ │   Input: Results + DataFrame                            │    │
-│ │   Output: report_Chenab_20260331_081600.md              │    │
-│ │   Location: Hydrology-Vault/Done/                       │    │
-│ └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ STEP 6: Task Complete                                           │
-│ Action file moved to: Done/completed_HYDROLOGY_*.md             │
-│ Dashboard updated with new report count                         │
-└─────────────────────────────────────────────────────────────────┘
+STEP 1: A CSV file is dropped into Hydrology-Vault/Inbox/
+
+STEP 2: The CSV watcher detects the file
+        Creates HYDROLOGY_<name>_<timestamp>.md in Needs_Action/
+
+STEP 3: The orchestrator picks up the task
+        Reads the action file and sets up the workflow state
+
+STEP 4: A reasoning plan is created
+        create_plan asks Qwen for a Plan_<name>_<timestamp>.md file
+
+STEP 5: Skills run in order
+        1. ingest_hydrology_data   file path -> DataFrame
+        2. compute_discharge       Q = Width x Depth x Velocity
+        3. analyze_flow_condition  low / moderate / high
+        4. send_alert_email        for high flow, creates an
+                                   APPROVAL_<river>_<timestamp>.md
+                                   file and waits for a YES or NO
+        5. generate_hydrology_report
+                                   report_<name>_<timestamp>.md in Done/
+
+STEP 6: The task is complete
+        The action file moves to Done/ and the dashboard is updated
 ```
 
 ---
 
-## Human-in-the-Loop Approval
+## Human Approval Workflow
 
-### How It Works
+### Why
 
-**Problem:** Flood alerts can cause panic if sent incorrectly.
+An alert email sent in error could cause confusion. The email step therefore waits for a person to approve it.
 
-**Solution:** Require human approval before sending any alert email.
-
-### Approval Workflow
+### How it works
 
 ```
-HIGH RISK Detected (Q > 150 m³/s)
-    │
-    ▼
+High flow detected (Q above 150 m3/s)
+    |
+    v
 Create APPROVAL_*.md in Needs_Action/
-    │
-    ▼
-File Contains:
-- River name and discharge value
-- Risk level classification
-- Email preview (subject + body)
-- DECISION: [type YES or NO here]
-    │
-    ▼
-Approval Watcher Detects Change (every 10 seconds)
-    │
-    ├─► DECISION: YES ──► Send email via Gmail SMTP
-    │                      Log to email_log.txt
-    │                      Move approval file to Done/
-    │
-    └─► DECISION: NO ────► Cancel email
-                           Log cancellation
-                           Move approval file to Done/
+    The file shows: river, discharge, risk level,
+    email preview, and a DECISION line
+    |
+    v
+Approval watcher reads the DECISION line
+    |
+    +-- YES: send the email via Gmail SMTP,
+    |        log it, move the file to Done/
+    |
+    +-- NO:  cancel the email, log it,
+             move the file to Done/
 ```
 
-### Example Approval File
+### Example approval file (sample values)
 
 ```markdown
 # Flood Alert Approval Request
 
 **River:** Chenab
-**Discharge:** 185.5 m³/s
+**Discharge:** 185.5 m3/s
 **Risk Level:** HIGH
 **Date:** 2026-03-31 08:15:30
 
@@ -361,12 +260,10 @@ Approval Watcher Detects Change (every 10 seconds)
 **Subject:** FLOOD ALERT - Chenab - 2026-03-31
 
 **Body:**
-A HIGH RISK flood condition has been detected on the Chenab River.
+A high flow condition has been flagged on the Chenab River.
 
-Discharge: 185.5 m³/s
-Threshold: 150.0 m³/s
-
-Immediate action recommended.
+Discharge: 185.5 m3/s
+Threshold: 150.0 m3/s
 
 ---
 
@@ -377,41 +274,35 @@ Immediate action recommended.
 DECISION: [type YES or NO here]
 ```
 
+The 150 m3/s threshold is a demonstration value used for every river. It is not an official flood-stage limit.
+
 ---
 
-## MCP Server Pattern
+## Email Module
 
-### What Is MCP?
+`mcp_email_server.py` wraps Gmail SMTP behind a `send_email()` function. MCP (Model Context Protocol) is a standard way for AI tools to call external services. Here the idea is used to keep external calls separate from the skills.
 
-**MCP = Model Context Protocol**
+Without the wrapper, every skill would handle SMTP itself:
 
-A standardized way for AI agents to interact with external services.
-
-### Why MCP?
-
-**Without MCP:**
 ```python
-# Every skill needs to know SMTP details
 def send_email(to, subject, body):
     server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
     server.login(email, password)
-    # ... 30 lines of SMTP handling ...
+    # ... more SMTP handling ...
 ```
 
-**With MCP:**
+With the wrapper, a skill only makes the call:
+
 ```python
-# Skill only cares about the action
 from mcp_email_server import send_email
 
 result = send_email(to=to, subject=subject, body=body)
-# Done!
 ```
 
-### MCP Email Server
+Simplified sketch of the module:
 
 ```python
-# mcp_email_server.py
-
+import os
 import smtplib
 from email.mime.text import MIMEText
 
@@ -426,89 +317,33 @@ def send_email(to, subject, body):
         server.login(os.getenv('GMAIL_ADDRESS'),
                      os.getenv('GMAIL_APP_PASSWORD'))
         server.send_message(msg)
-
-    return {'success': True, 'message_id': '...'}
 ```
 
----
-
-## Lessons Learned
-
-### What Worked Well
-
-1. **Modular Skills Pattern**
-   - Each skill is independently testable
-   - Easy to add new skills without breaking existing ones
-   - Clear input/output contracts
-
-2. **Human-in-the-Loop Approval**
-   - Critical for flood alerts (can't have false positives)
-   - Simple YES/NO decision in markdown file
-   - Approval watcher processes decisions automatically
-
-3. **Qwen AI Reasoning Plans**
-   - Transparency: can see exactly what AI was thinking
-   - Debugging: easier to understand AI decisions
-   - Audit trail: plans stored for future review
-
-4. **Watcher Architecture**
-   - File system monitoring with Watchdog library
-   - Event-driven triggers for real-time processing
-   - Multiple watchers can run simultaneously
-
-### What Was Harder Than Expected
-
-1. **Qwen AI Reliability**
-   - Qwen sometimes returns unexpected formats
-   - Had to add extensive fallback handling
-   - Prompt engineering is a skill unto itself
-
-2. **Windows Task Scheduler**
-   - Different behavior than cron on Linux
-   - Had to use batch files as intermediaries
-   - Permission issues required "Run as Administrator"
-
-3. **Gmail SMTP Setup**
-   - Requires App Password (not regular password)
-   - 2FA must be enabled first
-   - Rate limits for free accounts
-
-### What I Would Do Differently
-
-1. **Start with Testing**
-   - Write tests before implementing features
-   - Mock external services for unit tests
-   - Integration tests for full workflows
-
-2. **Use a Database**
-   - SQLite for task state tracking
-   - Better than parsing markdown files
-   - Easier to query for reports
-
-3. **Add Configuration Validation**
-   - Check .env variables at startup
-   - Provide clear error messages for missing config
-   - Auto-generate .env from .env.example
-
-4. **Build a Web Dashboard**
-   - Real-time monitoring from anywhere
-   - Visual charts for discharge trends
-   - Client portal for viewing reports
+Gmail needs an App Password, and 2-step verification must be enabled on the account first. This module has not been tested against a live Gmail account.
 
 ---
 
-## Summary
+## Notes and Limitations
 
-HydroWatch Pro's architecture is the result of iterative design decisions driven by real-world requirements:
-
-- **Autonomous operation** → Watchers + Orchestrator + Qwen AI
-- **Transparent decisions** → Reasoning plans stored as markdown
-- **Safe alerts** → Human-in-the-loop approval workflow
-- **Email integration** → Gmail SMTP via MCP server
-- **Real-time monitoring** → Dashboard updates every 10 seconds
-
-Each component serves a specific purpose, and the modular design allows for easy extension as requirements evolve.
+- Discharge is width x depth x velocity, which treats the channel as a rectangle.
+- Risk thresholds are fixed and the same for every river (low below 50 m3/s, moderate 50 to 150, high above 150). They are demonstration values.
+- Inputs are one width, depth and velocity value per river, with no time series or gauge calibration.
+- All results come from sample data. Nothing has been validated against observed records.
+- Qwen can return unexpected formats, so its output should be reviewed.
+- The email and LinkedIn parts are written but not tested against live accounts.
+- The project runs on Windows only because it uses Windows Task Scheduler.
+- The project was developed with an AI coding assistant (Qwen Code CLI).
 
 ---
 
-*Architecture documented by Zainab Mukhtar — March 2026*
+## Possible Improvements
+
+1. **Tests first.** Add unit tests for each skill and mock external services.
+2. **A database.** Use SQLite for task state instead of parsing markdown files.
+3. **Configuration checks.** Validate `.env` values at startup and give clear errors for missing ones.
+4. **Better hydrology.** Use cross-section geometry, per-river thresholds from published flood stages, and validation against gauge data.
+5. **Web dashboard.** Charts of discharge over time and downloadable reports.
+
+---
+
+*Documented by Zainab Mukhtar (March 2026, revised October 2026)*
