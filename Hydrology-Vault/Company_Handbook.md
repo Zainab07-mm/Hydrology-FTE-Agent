@@ -15,4 +15,4 @@ This system monitors river data and generates hydrology reports.
 - Done → final outputs
 
 ## Agent Brain
-Powered by Qwen CLI autonomous decision system.
+Uses the Qwen CLI to decide which processing step runs next.
