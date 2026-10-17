@@ -1,107 +1,120 @@
-# 🚀 Quick Start Guide - HydroWatch Pro
+# Quick Start Guide: HydroWatch Pro (Hydrology FTE Agent)
 
-> **Silver Tier: Functional Assistant for Hydrology Monitoring**
-
----
-
-## What You'll Get
-
-- ✅ Autonomous flood monitoring system
-- ✅ Email alerts with human approval
-- ✅ Professional hydrology reports
-- ✅ Qwen AI-powered decision making
-- ✅ 24/7 monitoring via Windows Task Scheduler
+> A prototype that turns river measurement CSV files into discharge values, flow classifications and reports. Tested on sample data only.
 
 ---
 
-## Prerequisites (5 minutes)
+## What You Get
 
-1. **Windows 10/11**
-2. **Python 3.8+** (tested on 3.13)
-3. **Qwen CLI** installed
-4. **Gmail account** (for alerts)
+- A watcher that picks up CSV files dropped into a folder
+- Discharge calculation (Q = width x depth x velocity) and a low / moderate / high classification
+- A markdown report for each file
+- An email alert step that waits for a person to approve it (written, not tested on a live Gmail account)
+- A Qwen model that decides which step runs next and writes the plain-language parts of the reports
+- Optional scheduling through Windows Task Scheduler
+
+This is a prototype. It has not been validated against observed river data and should not be used for real flood warnings.
 
 ---
 
-## Step 1: Install Qwen CLI (2 minutes)
+## Prerequisites
+
+1. Windows 10/11
+2. Python 3.8+ (tested on 3.13)
+3. Node.js, to install the Qwen CLI
+4. A Gmail account, only if you want to try the email alerts
+
+---
+
+## Step 1: Install the Qwen CLI
 
 ```bash
 npm install -g @qwen-code/qwen-code
 ```
 
-Verify installation:
+Check the installation:
+
 ```bash
 qwen --version
 ```
 
 ---
 
-## Step 2: Install Python Dependencies (1 minute)
+## Step 2: Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-**Required packages:**
+Main packages (the full list is in `requirements.txt`):
+
 - pandas (data processing)
 - watchdog (file monitoring)
 - python-dotenv (environment variables)
 - requests (HTTP calls)
-- smtplib-ssl (email)
 - pyperclip (clipboard)
 
 ---
 
-## Step 3: Configure Email (3 minutes)
+## Step 3: Configure email (optional)
 
-1. **Copy environment file:**
+You can skip this step. Without it, reports are still generated, and only the email alert step will not work.
+
+1. Copy the environment file:
+
    ```bash
    copy .env.example .env
    ```
 
-2. **Get Gmail App Password:**
-   - Go to: https://myaccount.google.com/apppasswords
-   - Enable 2FA if not already enabled
-   - Generate password for "Mail"
-   - Copy the 16 characters (remove spaces)
+2. Get a Gmail App Password:
+   - Go to https://myaccount.google.com/apppasswords
+   - Turn on 2-step verification first if it is off
+   - Generate a password for "Mail"
+   - Copy the 16 characters (remove the spaces)
 
-3. **Edit `.env` file:**
+3. Edit `.env`:
+
    ```env
    GMAIL_ADDRESS=your_email@gmail.com
    GMAIL_APP_PASSWORD=your_16_char_password
-   ALERT_RECIPIENT=client@example.com
+   ALERT_RECIPIENT=recipient@example.com
    ```
 
-4. **Test email:**
+4. Test the email module:
+
    ```bash
    python mcp_email_server.py
    ```
-   Check your inbox for test email.
+
+   Check the inbox for a test email. The email code has not been tested against a live account by the author, so report any errors you see.
 
 ---
 
-## Step 4: Run the Agent (1 minute)
+## Step 4: Run the agent
 
-**Autonomous mode (24/7):**
-```bash
-python main.py
-```
+Run all watchers (recommended):
 
-**Watcher mode (recommended):**
 ```bash
 python main.py --watcher
 ```
 
-**Manual workflow test:**
+Main loop:
+
+```bash
+python main.py
+```
+
+Single workflow run:
+
 ```bash
 python main.py --run
 ```
 
 ---
 
-## Step 5: Test with Sample Data (2 minutes)
+## Step 5: Try it with sample data
 
-1. **Create a CSV file** in `Hydrology-Vault/Inbox/`:
+1. Save this as a CSV file in `Hydrology-Vault/Inbox/`. The values are invented for testing.
 
    ```csv
    River,Width_m,Depth_m,Velocity_mps
@@ -111,59 +124,61 @@ python main.py --run
    Jhelum,40,2.8,1.6
    ```
 
-2. **Wait 10-20 seconds**
+2. Wait a few seconds while the watcher picks up the file.
 
-3. **Check results:**
+3. Check for the report:
+
    ```bash
    dir Hydrology-Vault\Done\report_*.md
    ```
 
-4. **Open the report** - see professional hydrology analysis!
+4. Open the report to see the discharge calculation and classification for each river.
 
 ---
 
-## Step 6: Test Flood Alert (if HIGH RISK)
+## Step 6: Try the approval step (only if a river is classified high)
 
-If your data shows HIGH RISK (Q > 150 m³/s):
+A river is classified high when discharge is above 150 m3/s. This threshold is a demonstration value used for every river, not an official flood-stage limit.
 
-1. **Find approval file:**
+1. Find the approval file:
+
    ```bash
    dir Hydrology-Vault\Needs_Action\APPROVAL_*.md
    ```
 
-2. **Open the file** in Notepad
+2. Open it in Notepad.
 
-3. **Find this line:**
+3. Find this line:
+
    ```
    DECISION: [type YES or NO here]
    ```
 
-4. **Change to:**
+4. Change it to:
+
    ```
    DECISION: YES
    ```
 
-5. **Save the file**
+5. Save the file and wait a few seconds with the watcher running.
 
-6. **Wait 10 seconds**
-
-7. **Check inbox** - flood alert email arrived!
+6. If email is configured, check the recipient inbox. If it is not configured, the step will report an error.
 
 ---
 
 ## Command Reference
 
 ```bash
-# Run autonomous mode (24/7)
+# Main loop
 python main.py
 
 # Run all watchers (recommended)
 python main.py --watcher
 
-# Run single workflow manually
+# Run a single workflow manually
 python main.py --run
 
-# Generate LinkedIn post
+# Generate a LinkedIn post draft
 python main.py --linkedin
 
 # System health check
@@ -177,85 +192,81 @@ python main.py --health
 ```
 Hydrology-Vault/
 ├── Inbox/                  # Drop CSV files here
-├── Weather_Inbox/          # Weather bulletins here
-├── Needs_Action/           # Approval requests wait here
-├── Done/                   # Completed reports stored here
-└── Dashboard.md            # System status (updates every 10s)
+├── Weather_Inbox/          # Weather bulletin files
+├── Needs_Action/           # Action files and approval requests
+├── Done/                   # Completed reports
+└── Dashboard.md            # Status file
 ```
 
 ---
 
-## What Happens Automatically
+## What Happens
 
-1. **CSV file dropped** → CSV Watcher detects it
-2. **Action file created** → `HYDROLOGY_*.md` in `Needs_Action/`
-3. **Orchestrator picks up** → Starts AI workflow
-4. **Qwen AI creates plan** → `Plan_*.md` with reasoning
-5. **Skills execute:**
-   - Ingest data → Load CSV
-   - Compute discharge → Q = W × D × V
-   - Analyze risk → LOW/MEDIUM/HIGH
-   - Send alert → Create approval request (if HIGH)
-   - Generate report → Professional markdown
-6. **Report saved** → `Done/report_*.md`
-7. **Dashboard updated** → New count visible
+1. A CSV file is dropped in `Inbox/` and the CSV watcher detects it.
+2. An action file (`HYDROLOGY_*.md`) is created in `Needs_Action/`.
+3. The orchestrator picks up the task.
+4. Qwen writes a plan file (`Plan_*.md`).
+5. The skills run:
+   - Ingest data: load the CSV
+   - Compute discharge: Q = W x D x V
+   - Analyze flow: low, moderate or high
+   - Send alert: create an approval request if high
+   - Generate report: markdown
+6. The report is saved to `Done/report_*.md`.
+7. The dashboard is updated.
 
 ---
 
 ## Troubleshooting
 
 ### Qwen CLI not found
+
+Install Node.js first, then:
+
 ```bash
-# Install Node.js first, then:
 npm install -g @qwen-code/qwen-code
 ```
 
 ### Email fails
-- Verify 2FA is enabled on Gmail
-- Generate new App Password
-- Check `.env` has correct credentials
+
+- Check that 2-step verification is on for the Gmail account
+- Generate a new App Password
+- Check that `.env` has the right values
 
 ### No reports generated
-- Check CSV has columns: `River`, `Width_m`, `Depth_m`, `Velocity_mps`
-- Verify file is in `Hydrology-Vault/Inbox/`
-- Check console for error messages
+
+- Check that the CSV has the columns `River`, `Width_m`, `Depth_m`, `Velocity_mps`
+- Check that the file is in `Hydrology-Vault/Inbox/`
+- Read the console output for error messages
 
 ### Approval not processed
-- Make sure `DECISION: YES` is exact format
-- Ensure approval_watcher is running (use `--watcher` mode)
+
+- Make sure the line reads exactly `DECISION: YES`
+- Make sure the approval watcher is running (use `--watcher` mode)
 
 ---
 
 ## Next Steps
 
-1. **Set up scheduling** (optional):
+1. Scheduling (optional):
+
    ```bash
    python schedule_setup.py
    ```
-   Runs agent daily at 8:00 AM
 
-2. **Add weather monitoring:**
-   - Drop IMD weather bulletins in `Weather_Inbox/`
-   - PDF Watcher extracts rainfall data automatically
+   This sets up a task in Windows Task Scheduler. Check the script for the run time before using it.
 
-3. **Configure LinkedIn** (optional):
-   - See LINKEDIN_SETUP.md for API credentials
-   - Auto-post professional updates
+2. Weather files: put weather bulletin files in `Weather_Inbox/`. See `watchers/pdf_watcher.py` for the format it reads.
+
+3. LinkedIn (optional): the LinkedIn code is written but has not been connected to an account. Set the token variables in `.env` (see `.env.example`). Without them, the tool saves a post draft and copies it to the clipboard. Read and correct any draft before you post it.
 
 ---
 
 ## Support
 
-**Documentation:**
-- README.md - Full project overview
-- ARCHITECTURE.md - System design details
-- .env.example - Configuration template
+- README.md: project overview and limitations
+- ARCHITECTURE.md: system design
+- .env.example: configuration template
 
-**Contact:**
-- Email: zainabmukhtar2277@gmail.com
-- GitHub: https://github.com/Zainab07-mm
-
----
-
-*Estimated setup time: 10-15 minutes*
-*First result: 2 minutes after dropping CSV file*
+Contact: zainab.mukhtar077@gmail.com
+GitHub: https://github.com/Zainab07-mm
